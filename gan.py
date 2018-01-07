@@ -74,56 +74,64 @@ def log_discriminator(epoch, logs):
     run.summary['discriminator_acc'] = logs['acc']
 
 def create_discriminator():
+    # discriminator = Sequential()
+    # discriminator.add(Conv2D(16, (3,3), input_shape=(28,28,1)))
+    # discriminator.add(LeakyReLU(alpha=0.3))
+    # discriminator.add(AveragePooling2D(pool_size=(2,2)))
+    # discriminator.add(Dropout(0.5))
+    # discriminator.add(Conv2D(32, (3,3)))
+    # discriminator.add(LeakyReLU(alpha=0.3))
+    #
+    # discriminator.add(AveragePooling2D(pool_size=(2,2)))
+    # discriminator.add(Dropout(0.5))
+    # discriminator.add(Flatten(input_shape=(28,28,1)))
+    # discriminator.add(Dropout(0.5))
+    # discriminator.add(Dense(16))
+    # discriminator.add(LeakyReLU(alpha=0.3))
+    #
+    # discriminator.add(Dropout(0.5))
+    # discriminator.add(Dense(2, activation='softmax'))
     discriminator = Sequential()
-    discriminator.add(Conv2D(16, (3,3), input_shape=(28,28,1)))
-    discriminator.add(LeakyReLU(alpha=0.3))
-    discriminator.add(AveragePooling2D(pool_size=(2,2)))
-    discriminator.add(Dropout(0.5))
-    discriminator.add(Conv2D(32, (3,3)))
-    discriminator.add(LeakyReLU(alpha=0.3))
-
-    discriminator.add(AveragePooling2D(pool_size=(2,2)))
-    discriminator.add(Dropout(0.5))
-    discriminator.add(Flatten(input_shape=(28,28,1)))
-    discriminator.add(Dropout(0.5))
-    discriminator.add(Dense(16))
-    discriminator.add(LeakyReLU(alpha=0.3))
-
-    discriminator.add(Dropout(0.5))
-    discriminator.add(Dense(2, activation='softmax'))
+    discriminator.add(Dense(1024, input_dim=784, kernel_initializer=initializers.RandomNormal(stddev=0.02)))
+    discriminator.add(LeakyReLU(0.2))
+    discriminator.add(Dropout(0.3))
+    discriminator.add(Dense(512))
+    discriminator.add(LeakyReLU(0.2))
+    discriminator.add(Dropout(0.3))
+    discriminator.add(Dense(256))
+    discriminator.add(LeakyReLU(0.2))
+    discriminator.add(Dropout(0.3))
+    discriminator.add(Dense(1, activation='sigmoid'))
     discriminator.compile(optimizer='sgd', loss='categorical_crossentropy',
         metrics=['acc'])
     return discriminator
 
 def create_generator():
-    # # sanity check braindead generator
+
+
     # generator = Sequential()
-    # generator.add(Dense(28*28, input_shape=(1,), activation='tanh'))
-    # generator.add(Reshape((28, 28, 1), input_shape=(1,)))
-    # # generator.add(UpSampling2D())
-    # # generator.add(Conv2DTranspose(64, (3,3), padding='same', activation='relu'))
-    # # generator.add(UpSampling2D())
-    # # generator.add(Conv2DTranspose(32, (3,3), padding='same', activation='relu'))
-    # # generator.add(Conv2DTranspose(1, (3,3), padding='same', activation='tanh'))
-    # generator.summary()
-    # return generator
+    # generator.add(Dense(7*7*128, input_shape=(config.generator_seed_dim,)))
+    # generator.add(LeakyReLU(alpha=0.3))
+    # generator.add(Reshape((7, 7, 128), input_shape=(1,)))
+    # generator.add(Dropout(0.5))
+    # generator.add(UpSampling2D())
+    # generator.add(Conv2DTranspose(config.generator_conv_size, (5,5), padding='same'))
+    # generator.add(LeakyReLU(alpha=0.3))
+    # generator.add(Dropout(0.5))
+    # generator.add(UpSampling2D())
+    # generator.add(Conv2DTranspose(1, (3,3), padding='same', activation='tanh'))
+    randomDim = config.generator_seed_dim
 
     generator = Sequential()
-    generator.add(Dense(7*7*128, input_shape=(config.generator_seed_dim,)))
-    generator.add(LeakyReLU(alpha=0.3))
+    generator.add(Dense(256, input_dim=randomDim, kernel_initializer=initializers.RandomNormal(stddev=0.02)))
+    generator.add(LeakyReLU(0.2))
+    generator.add(Dense(512))
+    generator.add(LeakyReLU(0.2))
+    generator.add(Dense(1024))
+    generator.add(LeakyReLU(0.2))
+    generator.add(Dense(784, activation='tanh'))
+    generator.compile(loss='categorical_crossentropy', optimizer=adam)
 
-    generator.add(Reshape((7, 7, 128), input_shape=(1,)))
-    generator.add(Dropout(0.5))
-    generator.add(UpSampling2D())
-    generator.add(Conv2DTranspose(config.generator_conv_size, (5,5), padding='same'))
-    generator.add(LeakyReLU(alpha=0.3))
-
-    generator.add(Dropout(0.5))
-    generator.add(UpSampling2D())
-    # generator.add(Conv2DTranspose(4, (3,3), padding='same', activation='relu'))
-    # generator.add(Dropout(0.5))
-    generator.add(Conv2DTranspose(1, (3,3), padding='same', activation='tanh'))
-    generator.summary()
     return generator
 
 def create_joint_model(generator, discriminator):
@@ -154,7 +162,7 @@ def train_discriminator(generator, discriminator, x_train, x_test, iter):
 
     wandb_logging_callback = LambdaCallback(on_epoch_end=log_discriminator)
     notebook_callback = notebook.KerasCallback(print.add_block(), len(train))
-    
+
     history = discriminator.fit(train, train_labels,
         epochs=config.discriminator_epochs,
         batch_size=config.batch_size, validation_data=(test, test_labels),
@@ -179,9 +187,9 @@ def train_generator(discriminator, joint_model):
 
     wandb_logging_callback = LambdaCallback(on_epoch_end=log_generator)
     notebook_callback = notebook.KerasCallback(print.add_block(), len(train))
-    
+
     discriminator.trainable = False
-    
+
     joint_model.fit(train, labels, epochs=config.generator_epochs,
             batch_size=config.batch_size,
             callbacks=[wandb_logging_callback, notebook_callback])
