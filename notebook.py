@@ -108,10 +108,12 @@ class Notebook:
 
         The optional `fmt` argument can take on several values:
 
-            - "auto"   : figures out the
-            - "alert"  : formats the string as an alert
-            - "header" : formats the string as a header
-            - "info"   : prints out df.info() on a DataFrame-like object
+            - "auto"     : figures out the
+            - "alert"    : formats the string as an alert
+            - "header"   : formats the string as a header
+            - "info"     : prints out df.info() on a DataFrame-like object
+            - "img"      : prints an image out
+            - "progress" : prints out a progress bar (for a 0<num<1)
         """
         # These types are output specially.
         dataframe_like_types = (pd.DataFrame, pd.Series, pd.Index, np.ndarray)
@@ -149,6 +151,8 @@ class Notebook:
             self._write_text(stream.getvalue())
         elif fmt == 'img':
             self._write_image(args[0])
+        elif fmt == 'progress':
+            self._write_progress(args[0])
         else:
             raise RuntimeError(f'fmt="{fmt}" not valid.')
 
@@ -196,7 +200,7 @@ class Notebook:
         plot_script, plot_html = bokeh.embed.components(p)
         self._dynamic_elts.append(plot_html + plot_script)
 
-    def _write_image(self, img): 
+    def _write_image(self, img):
         img = Image.fromarray(255 - (img * 255).astype(np.uint8))
         img_bytes = io.BytesIO()
         img.save(img_bytes, format='png')
@@ -204,6 +208,20 @@ class Notebook:
         style = 'style="border: 1px solid black;"'
         img_html = f'<img {style} src="data:image/png;base64,{img_base64}">'
         self._dynamic_elts.append(img_html)
+
+    def _write_progress(self, percent):
+        percent = max(0, min(100, int(percent * 100)))
+        html = f"""
+            <div class="progress">
+                <div class="progress-bar" role="progressbar"
+                    style="width: {percent}%"
+                    aria-valuenow="{percent}"
+                    aria-valuemin="0"
+                    aria-valuemax="100">
+                </div>
+            </div>
+        """
+        self._dynamic_elts.append(html)
 
     def _write_data(self, df):
         """Render a Pandas dataframe as html."""
