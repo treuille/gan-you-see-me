@@ -19,7 +19,7 @@ config = run.config
 
 config.discriminator_epochs = 10
 config.discriminator_examples = 1000
-config.generator_epochs = 1
+config.generator_epochs = 3
 config.generator_examples = 5000
 print(run.dir)
 
@@ -29,7 +29,6 @@ def mix_data(data, generator, length=1000):
     data= data[:num_examples, :, :]
     seeds = [np.random.uniform(-100.0, 100.0, size=num_examples)]
     fake_train = generator.predict(seeds)[:,:,:,0]
-    print(fake_train[0,:,:])
     combined  = np.concatenate([ data, fake_train])
 
     #print('garbage', garbage.shape, garbage.dtype)
@@ -58,8 +57,11 @@ def train_discriminator(generator, discriminator, x_train, x_test):
 
     train, train_labels = mix_data(x_train, generator, config.discriminator_examples)
     test, test_labels = mix_data(x_test, generator, config.discriminator_examples)
-    for i in range(5):
-        print("Test Data ", i, train[i,:,:,0], train_labels[i])
+    print("Training Discriminator")
+    for i in range(10):
+        print(train[i,:,:,0], fmt="img")
+        print(train_labels[i,0])
+
     discriminator.trainable = True
     discriminator.summary()
     discriminator.compile(optimizer='sgd', loss='categorical_crossentropy',
@@ -71,7 +73,6 @@ def train_discriminator(generator, discriminator, x_train, x_test):
         batch_size=config.batch_size, validation_data=(test, test_labels), callbacks = [wandb_logging_callback])
 
     discriminator.save(path.join(run.dir, "discriminator.h5"))
-    print("Done Training discriminator")
 
 def log_generator(epoch, logs):
     run.history.add({'generator_loss': logs['loss'],
@@ -99,8 +100,7 @@ def train_generator(generator, discriminator):
 
     generator.save(path.join(run.dir, "generator.h5"))
 
-#with notebook.Notebook() as print:
-def main():
+with notebook.Notebook() as print:
     # init wandb
 
     # load the real training data
@@ -133,5 +133,3 @@ def main():
     for i in range(100):
         train_discriminator(generator, discriminator, x_train, x_test)
         train_generator(generator, discriminator)
-
-main()
