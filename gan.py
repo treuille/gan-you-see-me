@@ -17,7 +17,7 @@ def mix_data(data, generator):
     num_examples=data.shape[0]
     seeds = [np.random.uniform(-100.0, 100.0, size=num_examples)]
     fake_train = generator.predict(seeds)[:,:,:,0]
-    print(fake_train.shape)
+    print(fake_train[0,:,:])
     combined  = np.concatenate([ data, fake_train])
 
     #print('garbage', garbage.shape, garbage.dtype)
@@ -42,6 +42,7 @@ def train_discriminator(generator, discriminator, x_train, x_test):
     test, test_labels = mix_data(x_test, generator)
 
     discriminator.trainable = True
+    discriminator.summary()
     discriminator.compile(optimizer=sgd, loss='categorical_crossentropy',
             metrics=['acc'])
     discriminator.fit(train, train_labels, epochs=1,batch_size=256,
