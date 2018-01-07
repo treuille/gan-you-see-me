@@ -19,7 +19,7 @@ config = run.config
 
 config.discriminator_epochs = 10
 config.discriminator_examples = 1000
-config.generator_epochs = 3
+config.generator_epochs = 10
 config.generator_examples = 5000
 print(run.dir)
 
@@ -57,10 +57,10 @@ def train_discriminator(generator, discriminator, x_train, x_test):
 
     train, train_labels = mix_data(x_train, generator, config.discriminator_examples)
     test, test_labels = mix_data(x_test, generator, config.discriminator_examples)
-    print("Training Discriminator")
+    print("Training Discriminator", fmt='header')
     for i in range(10):
-        print(train[i,:,:,0], fmt="img")
-        print(train_labels[i,0])
+        print((train[i,:,:,0] + 1.0) / 2.0, fmt="img")
+        print(train_labels[i,0], train[i,:,:,0].flatten().max(), train[i,:,:,0].flatten().min())
 
     discriminator.trainable = True
     discriminator.summary()
@@ -105,8 +105,8 @@ with notebook.Notebook() as print:
 
     # load the real training data
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
-    x_train = x_train / 255.
-    x_test = x_test / 255.
+    x_train = x_train / 255.0 * 2.0 - 1.0
+    x_test = x_test / 255.0 * 2.0 - 1.0
     x_train = x_train.astype('float32')
     x_test = x_test.astype('float32')
     #print('x_train', x_train.shape, x_train.dtype)
@@ -124,10 +124,10 @@ with notebook.Notebook() as print:
     discriminator.add(Dense(2, activation='softmax'))
 
     generator = Sequential()
-    generator.add(Dense(49, input_shape=(1,)))
+    generator.add(Dense(49, input_shape=(1,), activation='relu'))
     generator.add(Reshape((7, 7, 1), input_shape=(1,)))
-    generator.add(Conv2DTranspose(32, (3,3), input_shape=(100,), strides=2, padding='same'))
-    generator.add(Conv2DTranspose(1, (3,3), input_shape=(100,), strides=2, padding='same'))
+    generator.add(Conv2DTranspose(32, (3,3), input_shape=(100,), strides=2, padding='same', activation='relu'))
+    generator.add(Conv2DTranspose(1, (3,3), input_shape=(100,), strides=2, padding='same', activation='tanh'))
     generator.summary()
 
     for i in range(100):
