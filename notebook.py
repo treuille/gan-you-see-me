@@ -11,6 +11,11 @@ import time
 import traceback
 import uuid
 
+# for image encoding
+from PIL import Image
+import io
+import base64
+
 from bokeh import plotting
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -48,8 +53,10 @@ class Notebook:
                     s.send_response(200)
                     s.end_headers()
                     s.wfile.write(resource)
+
             def log_message(self, format, *args):
                 return
+
         self._httpd = \
             HTTPServer((Notebook._IP, Notebook._PORT), NotebookHandler)
 
@@ -63,7 +70,7 @@ class Notebook:
 
         # all done
         print(f'Started server at http://{Notebook._IP}:{Notebook._PORT}')
-        return self.write
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Shut down the server."""
@@ -71,7 +78,7 @@ class Notebook:
         if exc_type != None:
             tb_list = traceback.format_list(traceback.extract_tb(exc_tb))
             tb_list.append(f'{exc_type.__name__}: {exc_val}')
-            self.write('\n'.join(tb_list), fmt='alert')
+            self('\n'.join(tb_list), fmt='alert')
 
         # A small delay to flush anything left.
         time.sleep(Notebook._OPEN_WEBPAGE_SECS)
@@ -85,62 +92,7 @@ class Notebook:
         self._httpd.server_close()
         print('Closed down server.')
 
-    def _run_server(self):
-        self._keep_running = True
-        while self._keep_running:
-            self._httpd.handle_request()
-
-    def _open_webpage_as_needed(self):
-        """If we've received no requests after a time, open a webpage."""
-        time.sleep(Notebook._OPEN_WEBPAGE_SECS)
-        if self._n_transmitted_elts == None:
-            os.system(f'open http://{Notebook._IP}:{Notebook._PORT}')
-
-    def _get_resource(self, path):
-        """Returns a static / dynamic resource, or none if path is invalid."""
-        if path in Notebook._STATIC_PATHS:
-            return self._static_resources[path]
-        elif path == Notebook._DYNAMIC_PATH:
-            elts = '<div class="w-100"></div>'.join(
-                f'<div class="col mb-2">{elt}</div>'
-                    for elt in self._dynamic_elts)
-            self._n_transmitted_elts = len(self._dynamic_elts)
-            return bytes(elts, 'utf-8')
-        else:
-            return None
-
-    def _write_dom(self, tag, args, spaces_become='&nbsp;', classes=[]):
-        """Esacapes and wraps the text in an html tag."""
-        escaped_text = html.escape(' '.join(str(arg) for arg in args)) \
-            .replace(' ', spaces_become).replace('\n', '<br/>')
-        tag_class = ''
-        if classes:
-            tag_class = ' class="%s"' % ' '.join(classes)
-        self._dynamic_elts.append(
-            f'<{tag}{tag_class}>{escaped_text}</{tag}>')
-
-    def _write_text(self, text):
-        """Writes some text to the notebook."""
-        self._write_dom('samp', (text,))
-
-    def _write_plot(self, p):
-        """Adds a Bokeh plot to the notebook."""
-        plot_script, plot_html = bokeh.embed.components(p)
-        self._dynamic_elts.append(plot_html + plot_script)
-
-    def _write_data(self, df):
-        """Render a Pandas dataframe as html."""
-        if type(df) != pd.DataFrame:
-            df = pd.DataFrame(df)
-        id = f'dataframe-{uuid.uuid4()}'
-        pandas_table = '<table border="1" class="dataframe">'
-        notebook_table = f'<table id="{id}">'
-        table_html = df.to_html(bold_rows=False, sparsify=False) \
-            .replace(pandas_table, notebook_table)
-        table_script = f'<script>notebook.styleDataFrame("{id}");</script>'
-        self._dynamic_elts.append(table_html + table_script)
-
-    def write(self, *args, fmt='auto'):
+    def __call__(self, *args, fmt='auto'):
         """Writes it's arguments to notebook pages.
 
         with Notebook() as print:
@@ -195,5 +147,72 @@ class Notebook:
             stream = io.StringIO()
             pd.DataFrame(args[0]).info(buf=stream)
             self._write_text(stream.getvalue())
+        elif fmt == 'img':
+            self._write_image(args[0])
         else:
             raise RuntimeError(f'fmt="{fmt}" not valid.')
+
+
+    def _run_server(self):
+        self._keep_running = True
+        while self._keep_running:
+            self._httpd.handle_request()
+
+    def _open_webpage_as_needed(self):
+        """If we've received no requests after a time, open a webpage."""
+        time.sleep(Notebook._OPEN_WEBPAGE_SECS)
+        if self._n_transmitted_elts == None:
+            os.system(f'open http://{Notebook._IP}:{Notebook._PORT}')
+
+    def _get_resource(self, path):
+        """Returns a static / dynamic resource, or none if path is invalid."""
+        if path in Notebook._STATIC_PATHS:
+            return self._static_resources[path]
+        elif path == Notebook._DYNAMIC_PATH:
+            elts = '<div class="w-100"></div>'.join(
+                f'<div class="col mb-2">{elt}</div>'
+                    for elt in self._dynamic_elts)
+            self._n_transmitted_elts = len(self._dynamic_elts)
+            return bytes(elts, 'utf-8')
+        else:
+            return None
+
+    def _write_dom(self, tag, args, spaces_become='&nbsp;', classes=[]):
+        """Esacapes and wraps the text in an html tag."""
+        escaped_text = html.escape(' '.join(str(arg) for arg in args)) \
+            .replace(' ', spaces_become).replace('\n', '<br/>')
+        tag_class = ''
+        if classes:
+            tag_class = ' class="%s"' % ' '.join(classes)
+        self._dynamic_elts.append(
+            f'<{tag}{tag_class}>{escaped_text}</{tag}>')
+
+    def _write_text(self, text):
+        """Writes some text to the notebook."""
+        self._write_dom('samp', (text,))
+
+    def _write_plot(self, p):
+        """Adds a Bokeh plot to the notebook."""
+        plot_script, plot_html = bokeh.embed.components(p)
+        self._dynamic_elts.append(plot_html + plot_script)
+
+    def _write_image(self, img):
+        img = Image.fromarray(255 - (img * 255).astype(np.uint8))
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format='png')
+        img_base64 = base64.b64encode(img_bytes.getvalue()).decode('utf-8')
+        style = 'style="border: 1px solid black;"'
+        img_html = f'<img {style} src="data:image/png;base64,{img_base64}">'
+        self._dynamic_elts.append(img_html)
+
+    def _write_data(self, df):
+        """Render a Pandas dataframe as html."""
+        if type(df) != pd.DataFrame:
+            df = pd.DataFrame(df)
+        id = f'dataframe-{uuid.uuid4()}'
+        pandas_table = '<table border="1" class="dataframe">'
+        notebook_table = f'<table id="{id}">'
+        table_html = df.to_html(bold_rows=False, sparsify=False) \
+            .replace(pandas_table, notebook_table)
+        table_script = f'<script>notebook.styleDataFrame("{id}");</script>'
+        self._dynamic_elts.append(table_html + table_script)
