@@ -123,7 +123,7 @@ def create_generator():
     # generator.add(Conv2DTranspose(4, (3,3), padding='same', activation='relu'))
     # generator.add(Dropout(0.5))
     generator.add(Conv2DTranspose(1, (3,3), padding='same', activation='tanh'))
-    generator.summary()
+    generator.summary(print_fn=print)
     return generator
 
 def create_joint_model(generator, discriminator):
@@ -150,11 +150,11 @@ def train_discriminator(generator, discriminator, x_train, x_test, iter):
             scipy.misc.imsave(f'image-{iter}.jpg', train[i,:,:,0])
 
     discriminator.trainable = True
-    discriminator.summary()
+    discriminator.summary(print_fn=print)
 
     wandb_logging_callback = LambdaCallback(on_epoch_end=log_discriminator)
     notebook_callback = notebook.KerasCallback(print.add_block(), len(train))
-    
+
     history = discriminator.fit(train, train_labels,
         epochs=config.discriminator_epochs,
         batch_size=config.batch_size, validation_data=(test, test_labels),
@@ -179,9 +179,9 @@ def train_generator(discriminator, joint_model):
 
     wandb_logging_callback = LambdaCallback(on_epoch_end=log_generator)
     notebook_callback = notebook.KerasCallback(print.add_block(), len(train))
-    
+
     discriminator.trainable = False
-    
+
     joint_model.fit(train, labels, epochs=config.generator_epochs,
             batch_size=config.batch_size,
             callbacks=[wandb_logging_callback, notebook_callback])
