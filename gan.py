@@ -86,7 +86,7 @@ def create_discriminator():
     discriminator.add(Dropout(0.5))
     discriminator.add(Flatten(input_shape=(28,28,1)))
     discriminator.add(Dropout(0.5))
-    discriminator.add(Dense(16)
+    discriminator.add(Dense(16))
     discriminator.add(LeakyReLU(alpha=0.3))
 
     discriminator.add(Dropout(0.5))
@@ -109,7 +109,7 @@ def create_generator():
     # return generator
 
     generator = Sequential()
-    generator.add(Dense(7*7*128, input_shape=(config.generator_seed_dim,))
+    generator.add(Dense(7*7*128, input_shape=(config.generator_seed_dim,)))
     generator.add(LeakyReLU(alpha=0.3))
 
     generator.add(Reshape((7, 7, 128), input_shape=(1,)))
