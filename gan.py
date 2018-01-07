@@ -68,7 +68,7 @@ def train_discriminator(generator, discriminator, x_train, x_test):
     wandb_logging_callback = LambdaCallback(on_epoch_end=log_discriminator)
 
     history = discriminator.fit(train, train_labels, epochs=config.discriminator_epochs,
-        batch_size=config,.batch_size, validation_data=(test, test_labels), callbacks = [wandb_logging_callback])
+        batch_size=config.batch_size, validation_data=(test, test_labels), callbacks = [wandb_logging_callback])
 
     discriminator.save(path.join(run.dir, "discriminator.h5"))
     print("Done Training discriminator")
