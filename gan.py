@@ -2,7 +2,8 @@ import notebook
 import numpy as np
 
 from keras.models import Sequential
-from keras.layers import Conv2D, MaxPooling2D, Dropout, Dense, Flatten, Conv2DTranspose, Reshape
+from keras.layers import Conv2D, MaxPooling2D, Dropout, Dense, Flatten, \
+    Conv2DTranspose, Reshape, AveragePooling2D
 from keras.datasets import mnist
 from keras.utils import np_utils
 from keras.optimizers import SGD
@@ -116,9 +117,9 @@ with notebook.Notebook() as print:
     discriminator = Sequential()
 
     discriminator.add(Conv2D(16, (3,3), input_shape=(28,28,1), activation='relu'))
-    discriminator.add(MaxPooling2D(pool_size=(2,2)))
+    discriminator.add(AveragePooling2D(pool_size=(2,2)))
     discriminator.add(Conv2D(32, (3,3), activation='relu'))
-    discriminator.add(MaxPooling2D(pool_size=(2,2)))
+    discriminator.add(AveragePooling2D(pool_size=(2,2)))
     discriminator.add(Flatten(input_shape=(28,28,1)))
     discriminator.add(Dense(16, activation='relu'))
     discriminator.add(Dense(2, activation='softmax'))
