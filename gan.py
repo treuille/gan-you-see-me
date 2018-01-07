@@ -158,7 +158,7 @@ def train_discriminator(generator, discriminator, x_train, x_test, iter):
             scipy.misc.imsave(f'image-{iter}.jpg', train[i,:,:,0])
 
     discriminator.trainable = True
-    discriminator.summary()
+    discriminator.summary(print_fn=print)
 
     wandb_logging_callback = LambdaCallback(on_epoch_end=log_discriminator)
     notebook_callback = notebook.KerasCallback(print.add_block(), len(train))

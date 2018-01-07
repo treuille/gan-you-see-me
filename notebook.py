@@ -303,7 +303,7 @@ class Notebook(VerticalBlock):
         """If we've received no requests after a time, open a webpage."""
         time.sleep(Notebook._OPEN_WEBPAGE_SECS)
         if not self._received_GET:
-            os.system(f'open http://{Notebook._IP}:{Notebook._PORT}')
+            os.system(f'open http://127.0.0.1:{Notebook._PORT}')
 
 
     def _get_resource(self, path):
