@@ -152,7 +152,7 @@ def log_generator(epoch, logs):
     run.history.add({'generator_loss': logs['loss'],
                      'generator_acc': logs['acc'],
                      'discriminator_loss': 0.0,
-                     'discriminator_acc': 1-logs['acc'],})
+                     'discriminator_acc': (1-logs['acc'])/2.0+0.5})
     run.summary['generator_loss'] = logs['loss']
     run.summary['generator_acc'] = logs['acc']
 
