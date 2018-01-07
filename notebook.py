@@ -56,6 +56,10 @@ class HTMLBLock(Block):
 class VerticalBlock(Block):
     """A set of vertically stacked elements."""
 
+    # These types are output specially.
+    DATAFRAME_LIKE = (pd.DataFrame, pd.Series, pd.Index, np.ndarray)
+    FIGURE_LIKE = (plotting.Figure,)
+
     def __init__(self, parent):
         super().__init__(parent)
         self.clear()
@@ -96,11 +100,27 @@ class VerticalBlock(Block):
         self.add_html(
             f'<{tag}{tag_class}>{escaped_text}</{tag}>')
 
-    def text(self, text):
+    def text(self, *args):
         """Adds some text to the notebook."""
-        self.dom_elt('samp', (text,))
+        self.dom_elt('samp', args)
 
-    def data_frame(self, df):
+    def header(self, *args):
+        """Adds a header element."""
+        self.dom_elt('h4', args, classes=['mt-3'])
+
+    def alert(self, *args):
+        """Adds an alert box."""
+        self.dom_elt('div', args, classes=['alert', 'alert-danger'],
+            spaces_become=' ')
+
+    def info(self, dataframe):
+        if not isinstance(dataframe, VerticalBlock.DATAFRAME_LIKE):
+            raise RuntimeError('fmt="info" only operates on DataFrames.')
+        stream = io.StringIO()
+        pd.DataFrame(dataframe).info(buf=stream)
+        self.text(stream.getvalue())
+
+    def dataframe(self, df):
         """Render a Pandas dataframe as html."""
         if type(df) != pd.DataFrame:
             df = pd.DataFrame(df)
@@ -144,9 +164,19 @@ class VerticalBlock(Block):
         """Writes it's arguments to notebook pages.
 
         with Notebook() as print:
+            print('A Test', fmt='header')
             print('Hello world.')
             print('This is an alert', fmt='alert')
             print('This is a dataframe', pd.DataFrame([1, 2, 3]))
+
+        This also works:
+
+        with Notebook() as print:
+            print.header('A Test')
+            print('Hello world.')
+            print.alert('This is an alert')
+            print('This is a dataframe')
+            print.dataframe(pd.DataFrame([1, 2, 3]))
 
         Supported types are:
 
@@ -163,10 +193,6 @@ class VerticalBlock(Block):
             - "img"      : prints an image out
             - "progress" : prints out a progress bar (for a 0<num<1)
         """
-        # These types are output specially.
-        dataframe_like_types = (pd.DataFrame, pd.Series, pd.Index, np.ndarray)
-        figure_like_types = (plotting.Figure,)
-
         # Dispatch based on the format argument.
         if fmt == 'auto':
             string_buffer = []
@@ -175,28 +201,23 @@ class VerticalBlock(Block):
                     self.text(' '.join(string_buffer))
                 string_buffer[:] = []
             for arg in args:
-                if isinstance(arg, dataframe_like_types):
+                if isinstance(arg, VerticalBlock.DATAFRAME_LIKE):
                     flush_buffer()
-                    self.data_frame(arg)
-                elif isinstance(arg, figure_like_types):
+                    self.dataframe(arg)
+                elif isinstance(arg, VerticalBlock.FIGURE_LIKE):
                     flush_buffer()
                     self.plot(arg)
                 else:
                     string_buffer.append(str(arg))
             flush_buffer()
         elif fmt == 'alert':
-            self.dom_elt('div', args, classes=['alert', 'alert-danger'],
-                spaces_become=' ')
+            self.alert(*args)
         elif fmt == 'header':
-            self.dom_elt('h4', args, classes=['mt-3'])
+            self.header(*args)
         elif fmt == 'info':
             if len(args) != 1:
                 raise RuntimeError('fmt="info" only operates on one argument.')
-            if not isinstance(args[0], dataframe_like_types):
-                raise RuntimeError('fmt="info" only operates on DataFrames.')
-            stream = io.StringIO()
-            pd.DataFrame(args[0]).info(buf=stream)
-            self.text(stream.getvalue())
+            self.info(args[0])
         elif fmt == 'img':
             self.image(args[0])
         elif fmt == 'progress':
@@ -261,7 +282,7 @@ class Notebook(VerticalBlock):
         if exc_type != None:
             tb_list = traceback.format_list(traceback.extract_tb(exc_tb))
             tb_list.append(f'{exc_type.__name__}: {exc_val}')
-            self('\n'.join(tb_list), fmt='alert')
+            self.alert('\n'.join(tb_list))
 
         # A small delay to flush anything left.
         time.sleep(Notebook._OPEN_WEBPAGE_SECS)
