@@ -51,9 +51,9 @@ def train_discriminator(generator, discriminator, x_train, x_test):
 
 def train_generator(generator, discriminator):
     print("Training Generator")
-    num_examples = 256
+    num_examples = 10000
     train = [np.random.uniform(-100.0, 100.0, size=num_examples)]
-    labels = np_utils.to_categorical(np.ones(num_examples))
+    labels = np_utils.to_categorical(np.zeros(num_examples))
     joint_model = Sequential()
     joint_model.add(generator)
     joint_model.add(discriminator)
