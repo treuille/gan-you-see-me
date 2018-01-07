@@ -126,9 +126,14 @@ with notebook.Notebook() as print:
 
     generator = Sequential()
     generator.add(Dense(49, input_shape=(1,), activation='relu'))
+    generator.add(Dropout(0.5))
     generator.add(Reshape((7, 7, 1), input_shape=(1,)))
     generator.add(Conv2DTranspose(32, (3,3), input_shape=(100,), strides=2, padding='same', activation='relu'))
+    generator.add(Dropout(0.5))
+
     generator.add(Conv2DTranspose(1, (3,3), input_shape=(100,), strides=2, padding='same', activation='tanh'))
+    generator.add(Dropout(0.5))
+
     generator.summary()
 
     for i in range(100):
