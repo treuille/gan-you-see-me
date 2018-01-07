@@ -15,6 +15,12 @@ import wandb
 from wandb.wandb_keras import WandbKerasCallback
 
 run = wandb.init()
+config = run.config
+
+config.discriminator_epochs = 10
+config.discriminator_examples = 1000
+config.generator_epochs = 1
+config.generator_examples = 1000
 print(run.dir)
 
 def mix_data(data, generator, length=1000):
