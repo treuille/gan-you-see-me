@@ -41,8 +41,7 @@ class Block:
         """Sets dirty flag. True propogates up the tree."""
         self._dirty = dirty
         if (dirty and self._parent):
-            print('Propogating dirty flag up the tree.') # debug!
-            self._parent.set_dirty()
+            self._parent.set_dirty(True)
 
 class HTMLBLock(Block):
     """A single HTML element."""
@@ -73,6 +72,13 @@ class VerticalBlock(Block):
         """Clears the current list."""
         self._blocks = []
         self.set_dirty(True)
+
+    def add_block(self):
+        """Adds a new vertical block and returns it."""
+        block = VerticalBlock(self)
+        self._blocks.append(block)
+        self.set_dirty(True)
+        return block
 
     def add_html(self, html):
         """Adds a html to this block."""
@@ -261,7 +267,6 @@ class Notebook(VerticalBlock):
         time.sleep(Notebook._OPEN_WEBPAGE_SECS)
 
         # Delay server shutdown if we haven't transmitted everything yet
-        print(f'Sutting down server with dirty={self.is_dirty()}.') # debug
         if self.is_dirty() or not self._received_GET:
             print(f'Sleeping for {Notebook._FINAL_SHUTDOWN_SECS} '
                 'seconds to flush all elements.')
