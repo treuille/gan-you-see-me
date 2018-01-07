@@ -31,15 +31,17 @@ config.generator_conv_size = 64
 print(run.dir)
 
 def small_print(text):
-    print.text(text) #, tag='pre', newlines_become='\n')
+    print.text(text, style='font-size:0.75em')
 
 # previous_fake_train = [np.zeros((0,28,28))]
 def mix_data(data, generator, length=1000):
     num_examples=int(length/2)
 
     data= data[:num_examples, :, :]
-    seeds = [np.random.uniform(-100.0, 100.0,
-        size=(num_examples, config.generator_seed_dim))]
+
+
+    seeds = np.random.normal(0, 1, (num_examples, config.generator_seed_dim))
+
     fake_train = generator.predict(seeds)[:,:,:,0]
     # print('data.shape', data.shape)
     # print('fake_train.shape', fake_train.shape)
@@ -186,8 +188,8 @@ def log_generator(epoch, logs):
 def train_generator(discriminator, joint_model):
     print("Training Generator", fmt='header')
     num_examples = config.generator_examples
-    train = [np.random.uniform(-100.0, 100.0,
-        size=(num_examples, config.generator_seed_dim)) ]
+
+    train = np.random.normal(0, 1, (num_examples, config.generator_seed_dim))
     labels = np_utils.to_categorical(np.ones(num_examples))
 
     wandb_logging_callback = LambdaCallback(on_epoch_end=log_generator)
@@ -246,5 +248,6 @@ with notebook.Notebook() as print:
     iter = 0
     while True:
         iter += 1
+        print("Iter ", iter)
         train_discriminator(generator, discriminator, x_train, x_test, iter)
         train_generator(discriminator, joint_model)
