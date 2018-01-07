@@ -20,7 +20,7 @@ from bokeh import plotting
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 class Notebook:
-    _IP = '127.0.0.1'
+    _IP = '' #'ec2-34-239-163-48.compute-1.amazonaws.com'
     _PORT = 8314
     _STATIC_PATHS = {
         '/': 'html/notebook.html',
@@ -160,9 +160,10 @@ class Notebook:
 
     def _open_webpage_as_needed(self):
         """If we've received no requests after a time, open a webpage."""
-        time.sleep(Notebook._OPEN_WEBPAGE_SECS)
-        if self._n_transmitted_elts == None:
-            os.system(f'open http://{Notebook._IP}:{Notebook._PORT}')
+#        time.sleep(Notebook._OPEN_WEBPAGE_SECS)
+#        if self._n_transmitted_elts == None:
+#            os.system(f'open http://{Notebook._IP}:{Notebook._PORT}')
+        pass
 
     def _get_resource(self, path):
         """Returns a static / dynamic resource, or none if path is invalid."""
