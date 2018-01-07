@@ -137,7 +137,7 @@ def train_discriminator(generator, discriminator, x_train, x_test, iter):
     print("Training Discriminator", fmt='header')
     for i in range(10):
         print((train[i,:,:,0] + 1.0) / 2.0, fmt="img")
-        if train_labels[i,0] == 0.0:
+        if train_labels[i,0] == 1.0:
             scipy.misc.imsave(f'image-{iter}.jpg', train[i,:,:,0])
 
     discriminator.trainable = True
