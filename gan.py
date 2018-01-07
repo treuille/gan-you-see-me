@@ -13,6 +13,7 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras import metrics
 import keras
 from os import path
+import scipy.misc
 
 import wandb
 from wandb.wandb_keras import WandbKerasCallback
@@ -128,14 +129,16 @@ def create_joint_model(generator, discriminator):
 
     return joint_model
 
-def train_discriminator(generator, discriminator, x_train, x_test):
+
+def train_discriminator(generator, discriminator, x_train, x_test, iter):
 
     train, train_labels = mix_data(x_train, generator, config.discriminator_examples)
     test, test_labels = mix_data(x_test, generator, config.discriminator_examples)
     print("Training Discriminator", fmt='header')
     for i in range(10):
         print((train[i,:,:,0] + 1.0) / 2.0, fmt="img")
-        print(train_labels[i,0])
+        if train_labels[i,0] == 0.0:
+            scipy.misc.imsave(f'image-{iter}.jpg', image_array)
         
     discriminator.trainable = True
     discriminator.summary()
@@ -212,6 +215,8 @@ with notebook.Notebook() as print:
     # generator.fit(input, x_train, batch_size=16, epochs=10000,
     #     callbacks=[show_image_callback])
 
+    iter = 0
     while True:
-        train_discriminator(generator, discriminator, x_train, x_test)
+        iter += 1
+        train_discriminator(generator, discriminator, x_train, x_test, iter)
         train_generator(discriminator, joint_model)
