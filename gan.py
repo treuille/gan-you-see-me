@@ -26,7 +26,7 @@ config.discriminator_examples = 10000
 config.generator_epochs = 3
 config.generator_examples = 5000
 config.generator_seed_dim = 10
-config.generator_conv_size = 32
+config.generator_conv_size = 64
 print(run.dir)
 
 # previous_fake_train = [np.zeros((0,28,28))]
