@@ -315,3 +315,32 @@ class Notebook(VerticalBlock):
             return bytes(elts, 'utf-8')
         else:
             return None
+
+class KerasCallack(keras.callbacks.Callback):
+    """Outputs status to the notebook."""
+
+    def __init__(self, block, n_train):
+        self.block = block
+        self.n_train = n_train
+
+    def on_epoch_begin(self, epoch, logs={}):
+        self.block.text(f'Epoch {epoch}', tag='h5')
+        self.epoch_block = self.block.add_block()
+        self.n_processed = 0
+
+    def on_epoch_end(self, epoch, logs={}):
+        table = (f'{k:>10} : {v:>8.5f}' for (k, v) in logs.items())
+        self.block('\n'.join(table))
+
+    def on_batch_end(self, batch, logs={}):
+        def fmt(x):
+            if type(x) == np.float32:
+                return '{0:>8.5f}'.format(float(x))
+            else:
+                return '{0:>5s}'.format(str(x))
+        self.n_processed += logs['size']
+        percent_processed = self.n_processed / self.n_train
+
+        self.epoch_block.clear()
+        self.epoch_block.progress(percent_processed)
+        self.epoch_block(' | '.join(f'{k}: {fmt(v)}' for (k,v) in logs.items()))
