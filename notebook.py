@@ -1,5 +1,5 @@
 """Used to output data (tables, charts, and text) to a web browser."""
-
+import keras
 import bokeh.embed
 import html
 import io
@@ -318,7 +318,7 @@ class Notebook(VerticalBlock):
         else:
             return None
 
-class KerasCallack(keras.callbacks.Callback):
+class KerasCallback(keras.callbacks.Callback):
     """Outputs status to the notebook."""
 
     def __init__(self, block, n_train):
