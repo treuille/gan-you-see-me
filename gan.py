@@ -79,7 +79,7 @@ def create_discriminator():
     discriminator.add(LeakyReLU(alpha=0.3))
     discriminator.add(AveragePooling2D(pool_size=(2,2)))
     discriminator.add(Dropout(0.5))
-    discriminator.add(Conv2D(32, (3,3))
+    discriminator.add(Conv2D(32, (3,3)))
     discriminator.add(LeakyReLU(alpha=0.3))
 
     discriminator.add(AveragePooling2D(pool_size=(2,2)))
