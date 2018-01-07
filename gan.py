@@ -1,5 +1,6 @@
 import notebook
 import numpy as np
+import scipy.misc
 
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPooling2D, Dropout, Dense, Flatten, \
@@ -12,6 +13,7 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras import metrics
 import keras
 from os import path
+import scipy.misc
 
 import wandb
 from wandb.wandb_keras import WandbKerasCallback
@@ -19,11 +21,12 @@ from wandb.wandb_keras import WandbKerasCallback
 run = wandb.init()
 config = run.config
 
-config.discriminator_epochs = 1
+config.discriminator_epochs = 3
 config.discriminator_examples = 10000
-config.generator_epochs = 1
+config.generator_epochs = 3
 config.generator_examples = 5000
 config.generator_seed_dim = 10
+config.generator_conv_size = 32
 print(run.dir)
 
 # previous_fake_train = [np.zeros((0,28,28))]
@@ -62,8 +65,11 @@ def mix_data(data, generator, length=1000):
     return (combined, labels)
 
 def log_discriminator(epoch, logs):
-    run.history.add({'discriminator_loss': logs['loss'],
-                 'discriminator_acc': logs['acc']})
+    run.history.add({
+            'generator_loss': 0.0,
+            'generator_acc': (1.0-logs['acc'])*2.0,
+            'discriminator_loss': logs['loss'],
+            'discriminator_acc': logs['acc']})
     run.summary['discriminator_loss'] = logs['loss']
     run.summary['discriminator_acc'] = logs['acc']
 
@@ -73,12 +79,16 @@ def create_discriminator():
     discriminator.add(LeakyReLU(alpha=0.3))
     discriminator.add(AveragePooling2D(pool_size=(2,2)))
     discriminator.add(Dropout(0.5))
-    discriminator.add(Conv2D(32, (3,3), activation='relu'))
+    discriminator.add(Conv2D(32, (3,3)))
+    discriminator.add(LeakyReLU(alpha=0.3))
+
     discriminator.add(AveragePooling2D(pool_size=(2,2)))
     discriminator.add(Dropout(0.5))
     discriminator.add(Flatten(input_shape=(28,28,1)))
     discriminator.add(Dropout(0.5))
-    discriminator.add(Dense(16, activation='relu'))
+    discriminator.add(Dense(16))
+    discriminator.add(LeakyReLU(alpha=0.3))
+
     discriminator.add(Dropout(0.5))
     discriminator.add(Dense(2, activation='softmax'))
     discriminator.compile(optimizer='sgd', loss='categorical_crossentropy',
@@ -99,11 +109,15 @@ def create_generator():
     # return generator
 
     generator = Sequential()
-    generator.add(Dense(7*7*128, input_shape=(config.generator_seed_dim,), activation='relu'))
+    generator.add(Dense(7*7*128, input_shape=(config.generator_seed_dim,)))
+    generator.add(LeakyReLU(alpha=0.3))
+
     generator.add(Reshape((7, 7, 128), input_shape=(1,)))
     generator.add(Dropout(0.5))
     generator.add(UpSampling2D())
-    generator.add(Conv2DTranspose(16, (3,3), padding='same', activation='relu'))
+    generator.add(Conv2DTranspose(config.generator_conv_size, (5,5), padding='same'))
+    generator.add(LeakyReLU(alpha=0.3))
+
     generator.add(Dropout(0.5))
     generator.add(UpSampling2D())
     # generator.add(Conv2DTranspose(4, (3,3), padding='same', activation='relu'))
@@ -124,14 +138,16 @@ def create_joint_model(generator, discriminator):
 
     return joint_model
 
-def train_discriminator(generator, discriminator, x_train, x_test):
+
+def train_discriminator(generator, discriminator, x_train, x_test, iter):
 
     train, train_labels = mix_data(x_train, generator, config.discriminator_examples)
     test, test_labels = mix_data(x_test, generator, config.discriminator_examples)
     print("Training Discriminator", fmt='header')
     for i in range(10):
         print((train[i,:,:,0] + 1.0) / 2.0, fmt="img")
-        print(train_labels[i,0])
+        if train_labels[i,0] == 1.0:
+            scipy.misc.imsave(f'image-{iter}.jpg', train[i,:,:,0])
 
     discriminator.trainable = True
     discriminator.summary()
@@ -147,7 +163,9 @@ def train_discriminator(generator, discriminator, x_train, x_test):
 
 def log_generator(epoch, logs):
     run.history.add({'generator_loss': logs['loss'],
-                     'generator_acc': logs['acc']})
+                     'generator_acc': logs['acc'],
+                     'discriminator_loss': 0.0,
+                     'discriminator_acc': (1-logs['acc'])/2.0+0.5})
     run.summary['generator_loss'] = logs['loss']
     run.summary['generator_acc'] = logs['acc']
 
@@ -206,6 +224,8 @@ with notebook.Notebook() as print:
     # generator.fit(input, x_train, batch_size=16, epochs=10000,
     #     callbacks=[show_image_callback])
 
+    iter = 0
     while True:
-        train_discriminator(generator, discriminator, x_train, x_test)
+        iter += 1
+        train_discriminator(generator, discriminator, x_train, x_test, iter)
         train_generator(discriminator, joint_model)
