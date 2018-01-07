@@ -18,7 +18,7 @@ def mix_data(data, generator):
     seeds = [np.random.uniform(-100.0, 100.0, size=num_examples)]
     fake_train = generator.predict(seeds)[:,:,:,0]
     print(fake_train.shape)
-    combined  = np.concatenate([fake_train, data])
+    combined  = np.concatenate([ data, fake_train])
 
     #print('garbage', garbage.shape, garbage.dtype)
     #print(garbage[0])
@@ -53,7 +53,7 @@ def train_generator(generator, discriminator):
     print("Training Generator")
     num_examples = 10000
     train = [np.random.uniform(-100.0, 100.0, size=num_examples)]
-    labels = np_utils.to_categorical(np.zeros(num_examples))
+    labels = np_utils.to_categorical(np.ones(num_examples))
     joint_model = Sequential()
     joint_model.add(generator)
     joint_model.add(discriminator)
