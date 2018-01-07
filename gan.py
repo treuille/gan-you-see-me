@@ -86,7 +86,7 @@ def create_discriminator():
     discriminator.add(Dropout(0.5))
     discriminator.add(Flatten(input_shape=(28,28,1)))
     discriminator.add(Dropout(0.5))
-    discriminator.add(Dense(16,)
+    discriminator.add(Dense(16)
     discriminator.add(LeakyReLU(alpha=0.3))
 
     discriminator.add(Dropout(0.5))
