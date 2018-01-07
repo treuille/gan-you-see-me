@@ -6,19 +6,31 @@ from keras.layers import Conv2D, MaxPooling2D, Dropout, Dense, Flatten, Conv2DTr
 from keras.datasets import mnist
 from keras.utils import np_utils
 from keras.optimizers import SGD
-
+from keras.callbacks import LambdaCallback
 from keras import metrics
 import keras
+from os import path
 
 import wandb
 from wandb.wandb_keras import WandbKerasCallback
 
-def mix_data(data, generator):
-    num_examples=data.shape[0]
+run = wandb.init()
+config = run.config
+
+config.discriminator_epochs = 10
+config.discriminator_examples = 1000
+config.generator_epochs = 1
+config.generator_examples = 5000
+print(run.dir)
+
+def mix_data(data, generator, length=1000):
+    num_examples=int(length/2)
+
+    data= data[:num_examples, :, :]
     seeds = [np.random.uniform(-100.0, 100.0, size=num_examples)]
     fake_train = generator.predict(seeds)[:,:,:,0]
-    print(fake_train.shape)
-    combined  = np.concatenate([fake_train, data])
+    print(fake_train[0,:,:])
+    combined  = np.concatenate([ data, fake_train])
 
     #print('garbage', garbage.shape, garbage.dtype)
     #print(garbage[0])
@@ -36,22 +48,40 @@ def mix_data(data, generator):
 
     return (combined, labels)
 
+def log_discriminator(epoch, logs):
+    run.history.add({'discriminator_loss': logs['loss'],
+                 'discriminator_acc': logs['acc']})
+    run.summary['discriminator_loss'] = logs['loss']
+    run.summary['discriminator_acc'] = logs['acc']
+
 def train_discriminator(generator, discriminator, x_train, x_test):
 
-    train, train_labels = mix_data(x_train, generator)
-    test, test_labels = mix_data(x_test, generator)
-
+    train, train_labels = mix_data(x_train, generator, config.discriminator_examples)
+    test, test_labels = mix_data(x_test, generator, config.discriminator_examples)
+    for i in range(5):
+        print("Test Data ", i, train[i,:,:,0], train_labels[i])
     discriminator.trainable = True
-    discriminator.compile(optimizer=sgd, loss='categorical_crossentropy',
+    discriminator.summary()
+    discriminator.compile(optimizer='sgd', loss='categorical_crossentropy',
             metrics=['acc'])
-    discriminator.fit(train, train_labels, epochs=1,batch_size=256,
-                    validation_data=(test, test_labels))
+
+    wandb_logging_callback = LambdaCallback(on_epoch_end=log_discriminator)
+
+    history = discriminator.fit(train, train_labels, epochs=config.discriminator_epochs,
+        batch_size=config.batch_size, validation_data=(test, test_labels), callbacks = [wandb_logging_callback])
+
+    discriminator.save(path.join(run.dir, "discriminator.h5"))
     print("Done Training discriminator")
 
+def log_generator(epoch, logs):
+    run.history.add({'generator_loss': logs['loss'],
+                     'generator_acc': logs['acc']})
+    run.summary['generator_loss'] = logs['loss']
+    run.summary['generator_acc'] = logs['acc']
 
 def train_generator(generator, discriminator):
     print("Training Generator")
-    num_examples = 256
+    num_examples = config.generator_examples
     train = [np.random.uniform(-100.0, 100.0, size=num_examples)]
     labels = np_utils.to_categorical(np.ones(num_examples))
     joint_model = Sequential()
@@ -60,12 +90,18 @@ def train_generator(generator, discriminator):
 
     discriminator.trainable = False
 
-    joint_model.compile(optimizer=sgd, loss='categorical_crossentropy', metrics=['acc'])
-    joint_model.fit(train, labels, epochs=1,batch_size=256)
+    wandb_logging_callback = LambdaCallback(on_epoch_end=log_generator)
 
-with notebook.Notebook() as print:
+    joint_model.compile(optimizer='sgd', loss='categorical_crossentropy', metrics=['acc'])
+    joint_model.fit(train, labels, epochs=config.generator_epochs,
+            batch_size=config.batch_size,
+            callbacks=[wandb_logging_callback])
+
+    generator.save(path.join(run.dir, "generator.h5"))
+
+#with notebook.Notebook() as print:
+def main():
     # init wandb
-    run = wandb.init()
 
     # load the real training data
     (x_train, y_train), (x_test, y_test) = mnist.load_data()
@@ -97,3 +133,5 @@ with notebook.Notebook() as print:
     for i in range(100):
         train_discriminator(generator, discriminator, x_train, x_test)
         train_generator(generator, discriminator)
+
+main()
