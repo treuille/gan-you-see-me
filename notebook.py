@@ -19,78 +19,65 @@ import base64
 from bokeh import plotting
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-class Notebook:
-    _IP = '127.0.0.1'
-    _PORT = 8314
-    _STATIC_PATHS = {
-        '/': 'html/notebook.html',
-        '/notebook.js': 'html/notebook.js'
-    }
-    _DYNAMIC_PATH = '/dynamic.html'
-    _OPEN_WEBPAGE_SECS = 0.2
-    _FINAL_SHUTDOWN_SECS = 3.0
+class Block:
+    """A tree of html elements which can be 'dirty' if any subtree has
+    been editted."""
 
-    def __init__(self):
-        # load the template html and javasript
-        self._static_resources = {}
-        for http_path, resource_path in Notebook._STATIC_PATHS.items():
-            with open(resource_path) as data:
-                self._static_resources[http_path] = bytes(data.read(), 'utf-8')
+    def __init__(self, parent):
+        """Creates a new block. parent=None means no parent."""
+        self._parent = parent
+        self._dirty = False
 
-        # This is the list of dynamic html elements.
-        self._dynamic_elts = []
+    def get_html_list(self):
+        """Returns a list of html elements to display."""
+        raise NotImplementedError('Block is an abstract base class.')
 
-        # Number of elements transmitted via GET. (None means no GET received.)
-        self._n_transmitted_elts = None
+    def is_dirty(self):
+        """Indicates if any elements have been added to subtree since last
+        get_html_list()."""
+        return self._dirty
 
-        # Create the webserver.
-        class NotebookHandler(BaseHTTPRequestHandler):
-            def do_GET(s):
-                resource = self._get_resource(s.path)
-                if resource == None:
-                    s.send_error(404)
-                else:
-                    s.send_response(200)
-                    s.end_headers()
-                    s.wfile.write(resource)
+    def set_dirty(self, dirty):
+        """Sets dirty flag. True propogates up the tree."""
+        self._dirty = dirty
+        if (dirty and self._parent):
+            print('Propogating dirty flag up the tree.') # debug!
+            self._parent.set_dirty()
 
-            def log_message(self, format, *args):
-                return
+class HTMLBLock(Block):
+    """A single HTML element."""
 
-        self._httpd = \
-            HTTPServer((Notebook._IP, Notebook._PORT), NotebookHandler)
+    def __init__(self, parent, html):
+        super().__init__(parent)
+        self._html = html
 
-    def __enter__(self):
-        # start the webserver
-        threading.Thread(target=self._run_server, daemon=True).start()
+    def get_html_list(self):
+        return [ self._html ]
 
-        # if no gets received after a timeout, then launch the browser
-        threading.Thread(target=self._open_webpage_as_needed,
-            daemon=True).start()
+class VerticalBlock(Block):
+    """A set of vertically stacked elements."""
 
-        # all done
-        print(f'Started server at http://{Notebook._IP}:{Notebook._PORT}')
-        return self
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.clear()
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Shut down the server."""
-        # Display the stack trace if necessary.
-        if exc_type != None:
-            tb_list = traceback.format_list(traceback.extract_tb(exc_tb))
-            tb_list.append(f'{exc_type.__name__}: {exc_val}')
-            self('\n'.join(tb_list), fmt='alert')
+    def get_html_list(self):
+        """Returns a list of html elements to display."""
+        html_list = []
+        for block in self._blocks:
+            html_list.extend(block.get_html_list())
+        self._dirty = False
+        return html_list
 
-        # A small delay to flush anything left.
-        time.sleep(Notebook._OPEN_WEBPAGE_SECS)
+    def clear(self):
+        """Clears the current list."""
+        self._blocks = []
+        self.set_dirty(True)
 
-        # Delay server shutdown if we haven't transmitted everything yet
-        if self._n_transmitted_elts != len(self._dynamic_elts):
-            print(f'Sleeping for {Notebook._FINAL_SHUTDOWN_SECS} '
-                'seconds to flush all elements.')
-            time.sleep(Notebook._FINAL_SHUTDOWN_SECS)
-        self._keep_running = False
-        self._httpd.server_close()
-        print('Closed down server.')
+    def add_html(self, html):
+        """Adds a html to this block."""
+        self._blocks.append(HTMLBLock(self, html))
+        self.set_dirty(True)
 
     def __call__(self, *args, fmt='auto'):
         """Writes it's arguments to notebook pages.
@@ -156,31 +143,6 @@ class Notebook:
         else:
             raise RuntimeError(f'fmt="{fmt}" not valid.')
 
-
-    def _run_server(self):
-        self._keep_running = True
-        while self._keep_running:
-            self._httpd.handle_request()
-
-    def _open_webpage_as_needed(self):
-        """If we've received no requests after a time, open a webpage."""
-        time.sleep(Notebook._OPEN_WEBPAGE_SECS)
-        if self._n_transmitted_elts == None:
-            os.system(f'open http://{Notebook._IP}:{Notebook._PORT}')
-
-    def _get_resource(self, path):
-        """Returns a static / dynamic resource, or none if path is invalid."""
-        if path in Notebook._STATIC_PATHS:
-            return self._static_resources[path]
-        elif path == Notebook._DYNAMIC_PATH:
-            elts = '<div class="w-100"></div>'.join(
-                f'<div class="col mb-2">{elt}</div>'
-                    for elt in self._dynamic_elts)
-            self._n_transmitted_elts = len(self._dynamic_elts)
-            return bytes(elts, 'utf-8')
-        else:
-            return None
-
     def _write_dom(self, tag, args, spaces_become='&nbsp;', classes=[]):
         """Esacapes and wraps the text in an html tag."""
         escaped_text = html.escape(' '.join(str(arg) for arg in args)) \
@@ -188,7 +150,7 @@ class Notebook:
         tag_class = ''
         if classes:
             tag_class = ' class="%s"' % ' '.join(classes)
-        self._dynamic_elts.append(
+        self.add_html(
             f'<{tag}{tag_class}>{escaped_text}</{tag}>')
 
     def _write_text(self, text):
@@ -198,7 +160,7 @@ class Notebook:
     def _write_plot(self, p):
         """Adds a Bokeh plot to the notebook."""
         plot_script, plot_html = bokeh.embed.components(p)
-        self._dynamic_elts.append(plot_html + plot_script)
+        self.add_html(plot_html + plot_script)
 
     def _write_image(self, img):
         img = Image.fromarray(255 - (img * 255).astype(np.uint8))
@@ -207,7 +169,7 @@ class Notebook:
         img_base64 = base64.b64encode(img_bytes.getvalue()).decode('utf-8')
         style = 'style="border: 1px solid black;"'
         img_html = f'<img {style} src="data:image/png;base64,{img_base64}">'
-        self._dynamic_elts.append(img_html)
+        self.add_html(img_html)
 
     def _write_progress(self, percent):
         percent = max(0, min(100, int(percent * 100)))
@@ -221,7 +183,7 @@ class Notebook:
                 </div>
             </div>
         """
-        self._dynamic_elts.append(html)
+        self.add_html(html)
 
     def _write_data(self, df):
         """Render a Pandas dataframe as html."""
@@ -233,4 +195,99 @@ class Notebook:
         table_html = df.to_html(bold_rows=False, sparsify=False) \
             .replace(pandas_table, notebook_table)
         table_script = f'<script>notebook.styleDataFrame("{id}");</script>'
-        self._dynamic_elts.append(table_html + table_script)
+        self.add_html(table_html + table_script)
+
+class Notebook(VerticalBlock):
+    _IP = '127.0.0.1'
+    _PORT = 8314
+    _STATIC_PATHS = {
+        '/': 'html/notebook.html',
+        '/notebook.js': 'html/notebook.js'
+    }
+    _DYNAMIC_PATH = '/dynamic.html'
+    _OPEN_WEBPAGE_SECS = 0.2
+    _FINAL_SHUTDOWN_SECS = 3.0
+
+    def __init__(self):
+        super().__init__(None)
+
+        # load the template html and javasript
+        self._static_resources = {}
+        for http_path, resource_path in Notebook._STATIC_PATHS.items():
+            with open(resource_path) as data:
+                self._static_resources[http_path] = bytes(data.read(), 'utf-8')
+
+        # Create the webserver.
+        self._received_GET = False
+        class NotebookHandler(BaseHTTPRequestHandler):
+            def do_GET(s):
+                resource = self._get_resource(s.path)
+                if resource == None:
+                    s.send_error(404)
+                else:
+                    s.send_response(200)
+                    s.end_headers()
+                    s.wfile.write(resource)
+                self._received_GET = True
+
+            def log_message(self, format, *args):
+                return
+
+        self._httpd = \
+            HTTPServer((Notebook._IP, Notebook._PORT), NotebookHandler)
+
+    def __enter__(self):
+        # start the webserver
+        threading.Thread(target=self._run_server, daemon=True).start()
+
+        # if no gets received after a timeout, then launch the browser
+        threading.Thread(target=self._open_webpage_as_needed,
+            daemon=True).start()
+
+        # all done
+        print(f'Started server at http://{Notebook._IP}:{Notebook._PORT}')
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Shut down the server."""
+        # Display the stack trace if necessary.
+        if exc_type != None:
+            tb_list = traceback.format_list(traceback.extract_tb(exc_tb))
+            tb_list.append(f'{exc_type.__name__}: {exc_val}')
+            self('\n'.join(tb_list), fmt='alert')
+
+        # A small delay to flush anything left.
+        time.sleep(Notebook._OPEN_WEBPAGE_SECS)
+
+        # Delay server shutdown if we haven't transmitted everything yet
+        print(f'Sutting down server with dirty={self.is_dirty()}.') # debug
+        if self.is_dirty() or not self._received_GET:
+            print(f'Sleeping for {Notebook._FINAL_SHUTDOWN_SECS} '
+                'seconds to flush all elements.')
+            time.sleep(Notebook._FINAL_SHUTDOWN_SECS)
+        self._keep_running = False
+        self._httpd.server_close()
+        print('Closed down server.')
+
+    def _run_server(self):
+        self._keep_running = True
+        while self._keep_running:
+            self._httpd.handle_request()
+
+    def _open_webpage_as_needed(self):
+        """If we've received no requests after a time, open a webpage."""
+        time.sleep(Notebook._OPEN_WEBPAGE_SECS)
+        if not self._received_GET:
+            os.system(f'open http://{Notebook._IP}:{Notebook._PORT}')
+
+    def _get_resource(self, path):
+        """Returns a static / dynamic resource, or none if path is invalid."""
+        if path in Notebook._STATIC_PATHS:
+            return self._static_resources[path]
+        elif path == Notebook._DYNAMIC_PATH:
+            elts = '<div class="w-100"></div>'.join(
+                f'<div class="col mb-2">{elt}</div>'
+                    for elt in self.get_html_list())
+            return bytes(elts, 'utf-8')
+        else:
+            return None
