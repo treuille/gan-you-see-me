@@ -19,9 +19,9 @@ from wandb.wandb_keras import WandbKerasCallback
 run = wandb.init()
 config = run.config
 
-config.discriminator_epochs = 1
+config.discriminator_epochs = 3
 config.discriminator_examples = 10000
-config.generator_epochs = 1
+config.generator_epochs = 3
 config.generator_examples = 5000
 config.generator_seed_dim = 10
 print(run.dir)
@@ -62,8 +62,11 @@ def mix_data(data, generator, length=1000):
     return (combined, labels)
 
 def log_discriminator(epoch, logs):
-    run.history.add({'discriminator_loss': logs['loss'],
-                 'discriminator_acc': logs['acc']})
+    run.history.add({
+            'generator_loss': 0.0,
+            'generator_acc': (1.0-logs['acc'])*2.0,
+            'discriminator_loss': logs['loss'],
+            'discriminator_acc': logs['acc']})
     run.summary['discriminator_loss'] = logs['loss']
     run.summary['discriminator_acc'] = logs['acc']
 
@@ -147,7 +150,9 @@ def train_discriminator(generator, discriminator, x_train, x_test):
 
 def log_generator(epoch, logs):
     run.history.add({'generator_loss': logs['loss'],
-                     'generator_acc': logs['acc']})
+                     'generator_acc': logs['acc'],
+                     'discriminator_loss': 0.0,
+                     'discriminator_acc': 1-logs['acc'],})
     run.summary['generator_loss'] = logs['loss']
     run.summary['generator_acc'] = logs['acc']
 
