@@ -79,6 +79,61 @@ class VerticalBlock(Block):
         self._blocks.append(HTMLBLock(self, html))
         self.set_dirty(True)
 
+    def dom_elt(self, tag, args, spaces_become='&nbsp;', classes=[]):
+        """Adds a DOM element (escaping the text)."""
+
+        escaped_text = html.escape(' '.join(str(arg) for arg in args)) \
+            .replace(' ', spaces_become).replace('\n', '<br/>')
+        tag_class = ''
+        if classes:
+            tag_class = ' class="%s"' % ' '.join(classes)
+        self.add_html(
+            f'<{tag}{tag_class}>{escaped_text}</{tag}>')
+
+    def text(self, text):
+        """Adds some text to the notebook."""
+        self.dom_elt('samp', (text,))
+
+    def data_frame(self, df):
+        """Render a Pandas dataframe as html."""
+        if type(df) != pd.DataFrame:
+            df = pd.DataFrame(df)
+        id = f'dataframe-{uuid.uuid4()}'
+        pandas_table = '<table border="1" class="dataframe">'
+        notebook_table = f'<table id="{id}">'
+        table_html = df.to_html(bold_rows=False, sparsify=False) \
+            .replace(pandas_table, notebook_table)
+        table_script = f'<script>notebook.styleDataFrame("{id}");</script>'
+        self.add_html(table_html + table_script)
+
+    def plot(self, p):
+        """Adds a Bokeh plot to the notebook."""
+        plot_script, plot_html = bokeh.embed.components(p)
+        self.add_html(plot_html + plot_script)
+
+    def image(self, img):
+        img = Image.fromarray(255 - (img * 255).astype(np.uint8))
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format='png')
+        img_base64 = base64.b64encode(img_bytes.getvalue()).decode('utf-8')
+        style = 'style="border: 1px solid black;"'
+        img_html = f'<img {style} src="data:image/png;base64,{img_base64}">'
+        self.add_html(img_html)
+
+    def progress(self, percent):
+        percent = max(0, min(100, int(percent * 100)))
+        html = f"""
+            <div class="progress">
+                <div class="progress-bar" role="progressbar"
+                    style="width: {percent}%"
+                    aria-valuenow="{percent}"
+                    aria-valuemin="0"
+                    aria-valuemax="100">
+                </div>
+            </div>
+        """
+        self.add_html(html)
+
     def __call__(self, *args, fmt='auto'):
         """Writes it's arguments to notebook pages.
 
@@ -111,23 +166,23 @@ class VerticalBlock(Block):
             string_buffer = []
             def flush_buffer():
                 if string_buffer:
-                    self._write_text(' '.join(string_buffer))
+                    self.text(' '.join(string_buffer))
                 string_buffer[:] = []
             for arg in args:
                 if isinstance(arg, dataframe_like_types):
                     flush_buffer()
-                    self._write_data(arg)
+                    self.data_frame(arg)
                 elif isinstance(arg, figure_like_types):
                     flush_buffer()
-                    self._write_plot(arg)
+                    self.plot(arg)
                 else:
                     string_buffer.append(str(arg))
             flush_buffer()
         elif fmt == 'alert':
-            self._write_dom('div', args, classes=['alert', 'alert-danger'],
+            self.dom_elt('div', args, classes=['alert', 'alert-danger'],
                 spaces_become=' ')
         elif fmt == 'header':
-            self._write_dom('h4', args, classes=['mt-3'])
+            self.dom_elt('h4', args, classes=['mt-3'])
         elif fmt == 'info':
             if len(args) != 1:
                 raise RuntimeError('fmt="info" only operates on one argument.')
@@ -135,67 +190,13 @@ class VerticalBlock(Block):
                 raise RuntimeError('fmt="info" only operates on DataFrames.')
             stream = io.StringIO()
             pd.DataFrame(args[0]).info(buf=stream)
-            self._write_text(stream.getvalue())
+            self.text(stream.getvalue())
         elif fmt == 'img':
-            self._write_image(args[0])
+            self.image(args[0])
         elif fmt == 'progress':
-            self._write_progress(args[0])
+            self.progress(args[0])
         else:
             raise RuntimeError(f'fmt="{fmt}" not valid.')
-
-    def _write_dom(self, tag, args, spaces_become='&nbsp;', classes=[]):
-        """Esacapes and wraps the text in an html tag."""
-        escaped_text = html.escape(' '.join(str(arg) for arg in args)) \
-            .replace(' ', spaces_become).replace('\n', '<br/>')
-        tag_class = ''
-        if classes:
-            tag_class = ' class="%s"' % ' '.join(classes)
-        self.add_html(
-            f'<{tag}{tag_class}>{escaped_text}</{tag}>')
-
-    def _write_text(self, text):
-        """Writes some text to the notebook."""
-        self._write_dom('samp', (text,))
-
-    def _write_plot(self, p):
-        """Adds a Bokeh plot to the notebook."""
-        plot_script, plot_html = bokeh.embed.components(p)
-        self.add_html(plot_html + plot_script)
-
-    def _write_image(self, img):
-        img = Image.fromarray(255 - (img * 255).astype(np.uint8))
-        img_bytes = io.BytesIO()
-        img.save(img_bytes, format='png')
-        img_base64 = base64.b64encode(img_bytes.getvalue()).decode('utf-8')
-        style = 'style="border: 1px solid black;"'
-        img_html = f'<img {style} src="data:image/png;base64,{img_base64}">'
-        self.add_html(img_html)
-
-    def _write_progress(self, percent):
-        percent = max(0, min(100, int(percent * 100)))
-        html = f"""
-            <div class="progress">
-                <div class="progress-bar" role="progressbar"
-                    style="width: {percent}%"
-                    aria-valuenow="{percent}"
-                    aria-valuemin="0"
-                    aria-valuemax="100">
-                </div>
-            </div>
-        """
-        self.add_html(html)
-
-    def _write_data(self, df):
-        """Render a Pandas dataframe as html."""
-        if type(df) != pd.DataFrame:
-            df = pd.DataFrame(df)
-        id = f'dataframe-{uuid.uuid4()}'
-        pandas_table = '<table border="1" class="dataframe">'
-        notebook_table = f'<table id="{id}">'
-        table_html = df.to_html(bold_rows=False, sparsify=False) \
-            .replace(pandas_table, notebook_table)
-        table_script = f'<script>notebook.styleDataFrame("{id}");</script>'
-        self.add_html(table_html + table_script)
 
 class Notebook(VerticalBlock):
     _IP = '127.0.0.1'
