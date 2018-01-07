@@ -1,5 +1,6 @@
 import notebook
 import numpy as np
+import scipy.misc
 
 from keras.models import Sequential
 from keras.layers import Conv2D, MaxPooling2D, Dropout, Dense, Flatten, \
@@ -135,7 +136,7 @@ def train_discriminator(generator, discriminator, x_train, x_test):
     for i in range(10):
         print((train[i,:,:,0] + 1.0) / 2.0, fmt="img")
         print(train_labels[i,0])
-
+        
     discriminator.trainable = True
     discriminator.summary()
 
