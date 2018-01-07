@@ -90,17 +90,19 @@ class VerticalBlock(Block):
         self._blocks.append(HTMLBLock(self, html))
         self.set_dirty(True)
 
-    def text(self, *args, tag='samp', spaces_become='&nbsp;', classes=[]):
+    def text(self, *args, tag='samp', spaces_become='&nbsp;',
+                classes=[], style=''):
         """Adds a DOM element (escaping the text)."""
 
         escaped_text = html.escape(' '.join(str(arg) for arg in args)) \
             .replace(' ', spaces_become).replace('\n', '<br/>')
-        tag_class = ''
+        tag_class, tag_style = '', ''
         if classes:
             tag_class = ' class="%s"' % ' '.join(classes)
+        if style:
+            tag_style = f' style="{style}"'
         self.add_html(
-            f'<{tag}{tag_class}>{escaped_text}</{tag}>')
-
+            f'<{tag}{tag_class}{tag_style}>{escaped_text}</{tag}>')
 
     def header(self, *args):
         """Adds a header element."""
