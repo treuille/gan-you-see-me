@@ -89,7 +89,7 @@ class VerticalBlock(Block):
         self._blocks.append(HTMLBLock(self, html))
         self.set_dirty(True)
 
-    def dom_elt(self, tag, args, spaces_become='&nbsp;', classes=[]):
+    def text(self, *args, tag='samp', spaces_become='&nbsp;', classes=[]):
         """Adds a DOM element (escaping the text)."""
 
         escaped_text = html.escape(' '.join(str(arg) for arg in args)) \
@@ -100,17 +100,14 @@ class VerticalBlock(Block):
         self.add_html(
             f'<{tag}{tag_class}>{escaped_text}</{tag}>')
 
-    def text(self, *args):
-        """Adds some text to the notebook."""
-        self.dom_elt('samp', args)
 
     def header(self, *args):
         """Adds a header element."""
-        self.dom_elt('h4', args, classes=['mt-3'])
+        self.text(*args, tag='h4', classes=['mt-3'])
 
     def alert(self, *args):
         """Adds an alert box."""
-        self.dom_elt('div', args, classes=['alert', 'alert-danger'],
+        self.text(*args, tag='div', classes=['alert', 'alert-danger'],
             spaces_become=' ')
 
     def info(self, dataframe):
