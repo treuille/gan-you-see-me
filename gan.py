@@ -26,6 +26,7 @@ config.discriminator_examples = 10000
 config.generator_epochs = 3
 config.generator_examples = 5000
 config.generator_seed_dim = 10
+config.generate_conv_size = 32
 print(run.dir)
 
 # previous_fake_train = [np.zeros((0,28,28))]
@@ -108,7 +109,7 @@ def create_generator():
     generator.add(Reshape((7, 7, 128), input_shape=(1,)))
     generator.add(Dropout(0.5))
     generator.add(UpSampling2D())
-    generator.add(Conv2DTranspose(16, (3,3), padding='same', activation='relu'))
+    generator.add(Conv2DTranspose(config.generator_conv_size, (3,3), padding='same', activation='relu'))
     generator.add(Dropout(0.5))
     generator.add(UpSampling2D())
     # generator.add(Conv2DTranspose(4, (3,3), padding='same', activation='relu'))
