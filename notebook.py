@@ -48,6 +48,8 @@ class Notebook:
                     s.send_response(200)
                     s.end_headers()
                     s.wfile.write(resource)
+            def log_message(self, format, *args):
+                return
         self._httpd = \
             HTTPServer((Notebook._IP, Notebook._PORT), NotebookHandler)
 
