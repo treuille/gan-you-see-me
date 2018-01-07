@@ -79,12 +79,16 @@ def create_discriminator():
     discriminator.add(LeakyReLU(alpha=0.3))
     discriminator.add(AveragePooling2D(pool_size=(2,2)))
     discriminator.add(Dropout(0.5))
-    discriminator.add(Conv2D(32, (3,3), activation='relu'))
+    discriminator.add(Conv2D(32, (3,3))
+    discriminator.add(LeakyReLU(alpha=0.3))
+
     discriminator.add(AveragePooling2D(pool_size=(2,2)))
     discriminator.add(Dropout(0.5))
     discriminator.add(Flatten(input_shape=(28,28,1)))
     discriminator.add(Dropout(0.5))
-    discriminator.add(Dense(16, activation='relu'))
+    discriminator.add(Dense(16,)
+    discriminator.add(LeakyReLU(alpha=0.3))
+
     discriminator.add(Dropout(0.5))
     discriminator.add(Dense(2, activation='softmax'))
     discriminator.compile(optimizer='sgd', loss='categorical_crossentropy',
@@ -105,11 +109,15 @@ def create_generator():
     # return generator
 
     generator = Sequential()
-    generator.add(Dense(7*7*128, input_shape=(config.generator_seed_dim,), activation='relu'))
+    generator.add(Dense(7*7*128, input_shape=(config.generator_seed_dim,))
+    generator.add(LeakyReLU(alpha=0.3))
+
     generator.add(Reshape((7, 7, 128), input_shape=(1,)))
     generator.add(Dropout(0.5))
     generator.add(UpSampling2D())
-    generator.add(Conv2DTranspose(config.generator_conv_size, (3,3), padding='same', activation='relu'))
+    generator.add(Conv2DTranspose(config.generator_conv_size, (5,5), padding='same'))
+    generator.add(LeakyReLU(alpha=0.3))
+
     generator.add(Dropout(0.5))
     generator.add(UpSampling2D())
     # generator.add(Conv2DTranspose(4, (3,3), padding='same', activation='relu'))
