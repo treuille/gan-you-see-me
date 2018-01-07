@@ -301,16 +301,10 @@ class Notebook(VerticalBlock):
 
     def _open_webpage_as_needed(self):
         """If we've received no requests after a time, open a webpage."""
-<<<<<<< HEAD
-#        time.sleep(Notebook._OPEN_WEBPAGE_SECS)
-#        if self._n_transmitted_elts == None:
-#            os.system(f'open http://{Notebook._IP}:{Notebook._PORT}')
-        pass
-=======
         time.sleep(Notebook._OPEN_WEBPAGE_SECS)
         if not self._received_GET:
             os.system(f'open http://{Notebook._IP}:{Notebook._PORT}')
->>>>>>> f794281d7fdbc1eb2fe608f75660145bea321322
+
 
     def _get_resource(self, path):
         """Returns a static / dynamic resource, or none if path is invalid."""
