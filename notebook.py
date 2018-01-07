@@ -196,7 +196,7 @@ class Notebook:
         plot_script, plot_html = bokeh.embed.components(p)
         self._dynamic_elts.append(plot_html + plot_script)
 
-    def _write_image(self, img):
+    def _write_image(self, img): 
         img = Image.fromarray(255 - (img * 255).astype(np.uint8))
         img_bytes = io.BytesIO()
         img.save(img_bytes, format='png')
