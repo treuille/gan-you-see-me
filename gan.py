@@ -7,9 +7,10 @@ from keras.layers import Conv2D, MaxPooling2D, Dropout, Dense, Flatten, \
     Conv2DTranspose, Reshape, AveragePooling2D, UpSampling2D
 from keras.datasets import mnist
 from keras.utils import np_utils
-from keras.optimizers import SGD
+from keras.optimizers import SGD, adam
 from keras.callbacks import LambdaCallback
 from keras.layers.advanced_activations import LeakyReLU
+from keras import initializers
 from keras import metrics
 import keras
 from os import path
@@ -28,6 +29,9 @@ config.generator_examples = 5000
 config.generator_seed_dim = 10
 config.generator_conv_size = 64
 print(run.dir)
+
+def small_print(text):
+    print.text(text) #, tag='pre', newlines_become='\n')
 
 # previous_fake_train = [np.zeros((0,28,28))]
 def mix_data(data, generator, length=1000):
@@ -92,7 +96,8 @@ def create_discriminator():
     # discriminator.add(Dropout(0.5))
     # discriminator.add(Dense(2, activation='softmax'))
     discriminator = Sequential()
-    discriminator.add(Dense(1024, input_dim=784, kernel_initializer=initializers.RandomNormal(stddev=0.02)))
+    discriminator.add(Flatten(input_shape=(28,28,1)))
+    discriminator.add(Dense(1024, kernel_initializer=initializers.RandomNormal(stddev=0.02)))
     discriminator.add(LeakyReLU(0.2))
     discriminator.add(Dropout(0.3))
     discriminator.add(Dense(512))
@@ -101,7 +106,7 @@ def create_discriminator():
     discriminator.add(Dense(256))
     discriminator.add(LeakyReLU(0.2))
     discriminator.add(Dropout(0.3))
-    discriminator.add(Dense(1, activation='sigmoid'))
+    discriminator.add(Dense(2, activation='sigmoid'))
     discriminator.compile(optimizer='sgd', loss='categorical_crossentropy',
         metrics=['acc'])
     return discriminator
@@ -130,7 +135,8 @@ def create_generator():
     generator.add(Dense(1024))
     generator.add(LeakyReLU(0.2))
     generator.add(Dense(784, activation='tanh'))
-    generator.compile(loss='categorical_crossentropy', optimizer=adam)
+    generator.add(Reshape((28, 28, 1)))
+    generator.compile(loss='categorical_crossentropy', optimizer='adam')
 
     return generator
 
@@ -151,14 +157,13 @@ def train_discriminator(generator, discriminator, x_train, x_test, iter):
 
     train, train_labels = mix_data(x_train, generator, config.discriminator_examples)
     test, test_labels = mix_data(x_test, generator, config.discriminator_examples)
-    print("Training Discriminator", fmt='header')
+    print("Examples")
     for i in range(10):
         print((train[i,:,:,0] + 1.0) / 2.0, fmt="img")
-        if train_labels[i,0] == 1.0:
-            scipy.misc.imsave(f'image-{iter}.jpg', train[i,:,:,0])
 
     discriminator.trainable = True
-    discriminator.summary(print_fn=print)
+    print("Training Discriminator", fmt='header')
+    discriminator.summary(print_fn=small_print)
 
     wandb_logging_callback = LambdaCallback(on_epoch_end=log_discriminator)
     notebook_callback = notebook.KerasCallback(print.add_block(), len(train))
@@ -189,6 +194,9 @@ def train_generator(discriminator, joint_model):
     notebook_callback = notebook.KerasCallback(print.add_block(), len(train))
 
     discriminator.trainable = False
+    print("Training Generator", fmt='header')
+
+    joint_model.summary(print_fn=small_print)
 
     joint_model.fit(train, labels, epochs=config.generator_epochs,
             batch_size=config.batch_size,
